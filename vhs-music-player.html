@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VHS Music Player — Indie Songs by Decade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f5f0e8;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+    }
+
+    .app {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 2.5rem 1.5rem;
+      width: 100%;
+      max-width: 420px;
+    }
+
+    /* ── TV MONITOR ── */
+    .tv-wrap { position: relative; width: 240px; height: 228px; }
+
+    .tv-body {
+      width: 240px; height: 228px;
+      background: #8c8fa8;
+      border-radius: 30px;
+      position: relative;
+      box-shadow: inset 0 -5px 0 #6b6e85, inset 5px 0 0 #a0a3bc, inset -5px 0 0 #7a7d95;
+    }
+
+    .tv-screen-wrap {
+      position: absolute;
+      top: 18px; left: 18px; right: 18px;
+      height: 128px;
+      background: #2a2a2a;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 3px solid #4a4a5a;
+    }
+
+    .tv-screen {
+      width: 100%; height: 100%;
+      background: #0a0a0a;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      position: relative;
+    }
+
+    .tv-scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.22) 3px, rgba(0,0,0,0.22) 4px);
+      pointer-events: none;
+    }
+
+    .tv-song-name {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 17px;
+      letter-spacing: 2px;
+      color: #ff6b35;
+      text-align: center;
+      padding: 0 10px;
+      position: relative; z-index: 2;
+      line-height: 1.1;
+    }
+
+    .tv-artist {
+      font-size: 9px;
+      color: #aaa;
+      letter-spacing: 1.5px;
+      position: relative; z-index: 2;
+    }
+
+    .tv-progress {
+      width: 78%;
+      height: 2px;
+      background: #333;
+      border-radius: 1px;
+      margin-top: 4px;
+      position: relative; z-index: 2;
+      cursor: pointer;
+    }
+
+    .tv-progress-fill {
+      height: 100%;
+      background: #ff6b35;
+      border-radius: 1px;
+      width: 0%;
+      transition: width 0.5s linear;
+    }
+
+    .tv-time {
+      font-size: 8px;
+      color: #555;
+      letter-spacing: 1px;
+      position: relative; z-index: 2;
+    }
+
+    .tv-slot-area {
+      position: absolute;
+      bottom: 42px;
+      left: 50%; transform: translateX(-50%);
+      width: 130px; height: 8px;
+      background: #3a3a4a;
+      border-radius: 4px;
+      border: 1.5px solid #2a2a38;
+    }
+
+    .tv-bottom {
+      position: absolute;
+      bottom: 14px; left: 18px; right: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .tv-buttons { display: flex; gap: 5px; align-items: center; }
+
+    .tv-btn {
+      width: 24px; height: 24px;
+      background: #3a3a4a;
+      border-radius: 6px;
+      border: 1.5px solid #2a2a38;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s;
+    }
+    .tv-btn:hover { background: #ff6b35; }
+    .tv-btn i { font-size: 11px; color: #aaa; pointer-events: none; }
+    .tv-btn:hover i { color: #fff; }
+
+    .tv-dot { width: 6px; height: 6px; background: #5a5a6a; border-radius: 50%; }
+
+    .tv-knob {
+      width: 30px; height: 30px;
+      background: #3a3a4a;
+      border-radius: 50%;
+      border: 2px solid #2a2a38;
+      box-shadow: inset 0 2px 0 #5a5a6a;
+      cursor: pointer;
+      transition: transform 0.3s;
+    }
+    .tv-knob:hover { transform: rotate(45deg); background: #4a4a5a; }
+
+    /* ── VHS CARDS ── */
+    .cards-row {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+      align-items: flex-end;
+    }
+
+    .vhs-card {
+      width: 95px;
+      border-radius: 8px;
+      padding: 8px 8px 0;
+      cursor: pointer;
+      transition: transform 0.2s, box-shadow 0.2s;
+      border: 2px solid transparent;
+      position: relative;
+    }
+
+    .vhs-card:hover { transform: translateY(-4px); }
+    .vhs-card.active {
+      transform: translateY(-7px) scale(1.05);
+      border-color: #ff6b35;
+      box-shadow: 0 10px 24px rgba(255,107,53,0.28);
+    }
+
+    .vhs-card.cream { background: #f0ebe0; }
+    .vhs-card.red   { background: #c0392b; }
+    .vhs-card.navy  { background: #1e2a45; }
+
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 2px;
+    }
+
+    .card-title {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 15px;
+      line-height: 1;
+      letter-spacing: 0.5px;
+    }
+
+    .vhs-card.cream .card-title { color: #1a1a1a; }
+    .vhs-card.red .card-title   { color: #fff; }
+    .vhs-card.navy .card-title  { color: #e8e8e8; }
+
+    .uhs {
+      font-size: 7px; font-weight: 700;
+      padding: 2px 4px; border-radius: 2px; letter-spacing: 0.5px;
+    }
+
+    .vhs-card.cream .uhs { background: #f5c518; color: #1a1a1a; }
+    .vhs-card.red .uhs   { background: #4a90e2; color: #fff; }
+    .vhs-card.navy .uhs  { background: #4a90e2; color: #fff; }
+
+    .card-year {
+      font-family: 'Bebas Neue', sans-serif;
+      font-size: 26px; line-height: 1;
+      letter-spacing: -0.5px; margin: 2px 0;
+    }
+
+    .vhs-card.cream .card-year { color: #1a1a1a; }
+    .vhs-card.red .card-year   { color: #fff; }
+    .vhs-card.navy .card-year  { color: #e8e8e8; }
+
+    .card-nowplaying {
+      font-size: 7px; font-weight: 700;
+      padding: 3px 5px; border-radius: 2px;
+      margin-bottom: 4px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+
+    .vhs-card.cream .card-nowplaying { background: #fff; color: #1a1a1a; border: 1px solid #ddd; }
+    .vhs-card.red .card-nowplaying   { background: #fff; color: #c0392b; }
+    .vhs-card.navy .card-nowplaying  { background: rgba(255,255,255,0.1); color: #e8e8e8; border: 1px solid rgba(255,255,255,0.15); }
+
+    .card-meta {
+      display: flex; justify-content: space-between;
+      font-size: 6px; letter-spacing: 0.5px; margin-bottom: 5px;
+    }
+
+    .vhs-card.cream .card-meta { color: #888; }
+    .vhs-card.red .card-meta   { color: rgba(255,255,255,0.6); }
+    .vhs-card.navy .card-meta  { color: rgba(232,232,232,0.45); }
+
+    .meta-sq { display: flex; gap: 2px; align-items: center; }
+    .sq { width: 6px; height: 6px; border-radius: 1px; }
+    .vhs-card.cream .sq { background: #555; }
+    .vhs-card.red .sq   { background: rgba(255,255,255,0.5); }
+    .vhs-card.navy .sq  { background: rgba(232,232,232,0.35); }
+
+    .cassette {
+      height: 34px; border-radius: 3px 3px 0 0;
+      display: flex; align-items: center; justify-content: center;
+      gap: 10px; position: relative;
+    }
+
+    .vhs-card.cream .cassette { background: #2a2a2a; }
+    .vhs-card.red .cassette   { background: #1a0a08; }
+    .vhs-card.navy .cassette  { background: #0d1520; }
+
+    .reel {
+      width: 20px; height: 20px; border-radius: 50%;
+      border: 1.5px solid #555; background: #1a1a1a;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    .reel-inner { width: 6px; height: 6px; border-radius: 50%; background: #444; }
+    .reel.spin { animation: spin 1.2s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .tape-win {
+      position: absolute;
+      width: 30px; height: 12px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid #444; border-radius: 1px;
+    }
+
+    /* ── SONG LIST ── */
+    .song-list { width: 100%; max-width: 320px; }
+
+    .song-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 10px; border-radius: 5px; cursor: pointer;
+      border-bottom: 0.5px solid rgba(0,0,0,0.07);
+      transition: background 0.12s;
+    }
+
+    .song-item:hover { background: rgba(0,0,0,0.04); }
+    .song-item.active { background: rgba(255,107,53,0.09); }
+
+    .s-num { font-size: 10px; color: #bbb; width: 14px; text-align: right; }
+    .song-item.active .s-num { color: #ff6b35; }
+
+    .s-info { flex: 1; min-width: 0; }
+    .s-name { font-size: 11px; color: #333; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .s-artist { font-size: 10px; color: #999; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-item.active .s-name { color: #ff6b35; }
+
+    .s-dur { font-size: 10px; color: #bbb; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- TV Monitor -->
+  <div class="tv-wrap">
+    <div class="tv-body">
+      <div class="tv-screen-wrap">
+        <div class="tv-screen">
+          <div class="tv-scanlines"></div>
+          <div class="tv-song-name" id="tvSong">MYKONOS</div>
+          <div class="tv-artist" id="tvArtist">FLEET FOXES</div>
+          <div class="tv-progress" id="tvProgressBar" onclick="seekTo(event)">
+            <div class="tv-progress-fill" id="tvFill"></div>
+          </div>
+          <div class="tv-time" id="tvTime">0:00 / 3:45</div>
+        </div>
+      </div>
+      <div class="tv-slot-area"></div>
+      <div class="tv-bottom">
+        <div class="tv-buttons">
+          <div class="tv-btn" onclick="prevSong()" title="Previous"><i class="ti ti-player-skip-back"></i></div>
+          <div class="tv-btn" id="tvPlayBtn" onclick="togglePlay()" title="Play/Pause"><i class="ti ti-player-play" id="tvPlayIcon"></i></div>
+          <div class="tv-btn" onclick="nextSong()" title="Next"><i class="ti ti-player-skip-forward"></i></div>
+        </div>
+        <div class="tv-dot"></div>
+        <div class="tv-knob" onclick="togglePlay()" title="Play/Pause"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- VHS Cards -->
+  <div class="cards-row">
+    <div class="vhs-card cream" id="card0" onclick="setDecade(0)">
+      <div class="card-top">
+        <div class="card-title">INDIE<br>SONGS</div>
+        <span class="uhs">UHS</span>
+      </div>
+      <div class="card-year">2020s</div>
+      <div class="card-nowplaying" id="cp0">wohoooo</div>
+      <div class="card-meta">
+        <span>Hi-Fi Stereo</span>
+        <div class="meta-sq"><div class="sq"></div><div class="sq"></div><span style="margin-left:3px">Standard</span></div>
+      </div>
+      <div class="cassette">
+        <div class="tape-win"></div>
+        <div class="reel" id="rl0"><div class="reel-inner"></div></div>
+        <div class="reel" id="rr0"><div class="reel-inner"></div></div>
+      </div>
+    </div>
+
+    <div class="vhs-card red active" id="card1" onclick="setDecade(1)">
+      <div class="card-top">
+        <div class="card-title">INDIE<br>SONGS</div>
+        <span class="uhs">UHS</span>
+      </div>
+      <div class="card-year">2010s</div>
+      <div class="card-nowplaying" id="cp1">YAYYY</div>
+      <div class="card-meta">
+        <span>Extra Quality</span>
+        <div class="meta-sq"><div class="sq"></div><div class="sq"></div><span style="margin-left:3px">Standard</span></div>
+      </div>
+      <div class="cassette">
+        <div class="tape-win"></div>
+        <div class="reel" id="rl1"><div class="reel-inner"></div></div>
+        <div class="reel" id="rr1"><div class="reel-inner"></div></div>
+      </div>
+    </div>
+
+    <div class="vhs-card navy" id="card2" onclick="setDecade(2)">
+      <div class="card-top">
+        <div class="card-title">INDIE<br>SONGS</div>
+        <span class="uhs">UHS</span>
+      </div>
+      <div class="card-year">2000s</div>
+      <div class="card-nowplaying" id="cp2">HURAYY</div>
+      <div class="card-meta">
+        <span>Fine Grain</span>
+        <div class="meta-sq"><div class="sq"></div><div class="sq"></div><span style="margin-left:3px">Standard</span></div>
+      </div>
+      <div class="cassette">
+        <div class="tape-win"></div>
+        <div class="reel" id="rl2"><div class="reel-inner"></div></div>
+        <div class="reel" id="rr2"><div class="reel-inner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Song List -->
+  <div class="song-list" id="songList"></div>
+
+</div>
+
+<script>
+  const decades = [
+    { theme:'cream', songs:[
+      {name:'Collapsed in Sunbeams', artist:'Arlo Parks', dur:'2:54'},
+      {name:'Before I Knew It', artist:'Japanese Breakfast', dur:'3:12'},
+      {name:'Hardline', artist:'Julien Baker', dur:'4:01'},
+      {name:'In California', artist:'Hozier', dur:'4:22'},
+      {name:'Sidelines', artist:'Phoebe Bridgers', dur:'3:38'},
+    ]},
+    { theme:'red', songs:[
+      {name:'Mykonos', artist:'Fleet Foxes', dur:'3:45'},
+      {name:'Holocene', artist:'Bon Iver', dur:'5:37'},
+      {name:'Ribs', artist:'Lorde', dur:'4:01'},
+      {name:'Such Great Heights', artist:'Iron & Wine', dur:'4:26'},
+      {name:'Naked As We Came', artist:'Iron & Wine', dur:'2:58'},
+    ]},
+    { theme:'navy', songs:[
+      {name:'Such Great Heights', artist:'The Postal Service', dur:'4:26'},
+      {name:'New Soul', artist:'Yael Naim', dur:'3:44'},
+      {name:'A Comet Appears', artist:'The Shins', dur:'4:08'},
+      {name:'District Sleeps Alone', artist:'The Postal Service', dur:'5:03'},
+      {name:'Caring Is Creepy', artist:'The Shins', dur:'3:50'},
+    ]}
+  ];
+
+  let dec=1, song=0, playing=false, elapsed=0, timer=null;
+
+  function parseDur(d){const p=d.split(':');return +p[0]*60+ +p[1];}
+  function fmtTime(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0');}
+
+  function setDecade(i){dec=i;song=0;elapsed=0;stopTimer();playing=false;updateUI();}
+
+  function selectSong(i){song=i;elapsed=0;stopTimer();playing=true;startTimer();updateUI();}
+
+  function togglePlay(){playing=!playing;if(playing)startTimer();else stopTimer();updateUI();}
+
+  function prevSong(){song=(song-1+decades[dec].songs.length)%decades[dec].songs.length;elapsed=0;stopTimer();if(playing)startTimer();updateUI();}
+
+  function nextSong(){song=(song+1)%decades[dec].songs.length;elapsed=0;stopTimer();if(playing)startTimer();updateUI();}
+
+  function startTimer(){
+    const total=parseDur(decades[dec].songs[song].dur);
+    timer=setInterval(()=>{
+      elapsed++;
+      if(elapsed>=total){elapsed=0;nextSong();return;}
+      refreshProgress();
+    },1000);
+  }
+
+  function stopTimer(){if(timer){clearInterval(timer);timer=null;}}
+
+  function refreshProgress(){
+    const s=decades[dec].songs[song];
+    const total=parseDur(s.dur);
+    const pct=total>0?Math.round((elapsed/total)*100):0;
+    document.getElementById('tvFill').style.width=pct+'%';
+    document.getElementById('tvTime').textContent=fmtTime(elapsed)+' / '+s.dur;
+  }
+
+  function seekTo(e){
+    const bar=document.getElementById('tvProgressBar');
+    const rect=bar.getBoundingClientRect();
+    const ratio=Math.max(0,Math.min(1,(e.clientX-rect.left)/rect.width));
+    elapsed=Math.round(ratio*parseDur(decades[dec].songs[song].dur));
+    refreshProgress();
+  }
+
+  function updateUI(){
+    const s=decades[dec].songs[song];
+    document.getElementById('tvSong').textContent=s.name.toUpperCase();
+    document.getElementById('tvArtist').textContent=s.artist.toUpperCase();
+    refreshProgress();
+    document.getElementById('tvPlayIcon').className=playing?'ti ti-player-pause':'ti ti-player-play';
+    for(let i=0;i<3;i++){
+      document.getElementById('card'+i).classList.toggle('active',i===dec);
+      const spin=i===dec&&playing;
+      document.getElementById('rl'+i).classList.toggle('spin',spin);
+      document.getElementById('rr'+i).classList.toggle('spin',spin);
+      document.getElementById('cp'+i).textContent=i===dec?s.name.toUpperCase().slice(0,12):['wohoooo','YAYYY','HURAYY'][i];
+    }
+    const list=document.getElementById('songList');
+    list.innerHTML=decades[dec].songs.map((t,i)=>`
+      <div class="song-item${i===song?' active':''}" onclick="selectSong(${i})">
+        <span class="s-num">${i+1}</span>
+        <div class="s-info">
+          <div class="s-name">${t.name}</div>
+          <div class="s-artist">${t.artist}</div>
+        </div>
+        <span class="s-dur">${t.dur}</span>
+      </div>
+    `).join('');
+  }
+
+  updateUI();
+</script>
+</body>
+</html>
