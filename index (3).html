@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VHS Music Player</title>
+  <link href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Playfair+Display:ital,wght@0,700;1,400&family=Courier+Prime:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #f7f4ee;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Courier Prime', monospace;
+      gap: 36px;
+      padding: 60px 20px;
+    }
+
+    /* ── TV ── */
+    .tv {
+      width: 340px;
+      height: 326px;
+      background: #8c8fa8;
+      border-radius: 44px;
+      position: relative;
+      box-shadow:
+        inset 0 -8px 0 #6b6e85,
+        inset 8px 0 0 #aaadC2,
+        inset -8px 0 0 #7a7d95,
+        0 20px 60px rgba(0,0,0,0.15);
+      transition: box-shadow 0.4s;
+    }
+
+    .tv.off {
+      box-shadow:
+        inset 0 -8px 0 #4a4c5a,
+        inset 8px 0 0 #6a6c80,
+        inset -8px 0 0 #555668,
+        0 10px 30px rgba(0,0,0,0.1);
+    }
+
+    .tv-screen-wrap {
+      position: absolute;
+      top: 22px; left: 22px; right: 22px;
+      height: 192px;
+      background: #111;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 4px solid #3a3a4a;
+      transition: border-color 0.4s;
+    }
+
+    .tv-screen {
+      width: 100%; height: 100%;
+      background: #080808;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      position: relative;
+      transition: background 0.5s;
+    }
+
+    /* CRT glow when playing */
+    .tv-screen.glow {
+      background: #0a0805;
+      box-shadow: inset 0 0 40px rgba(255, 107, 53, 0.08);
+    }
+
+    .scanlines {
+      position: absolute; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0,0,0,0.15) 3px, rgba(0,0,0,0.15) 4px);
+      pointer-events: none; z-index: 3;
+    }
+
+    /* screen flicker on power on */
+    @keyframes flicker {
+      0%   { opacity: 0; }
+      10%  { opacity: 1; }
+      12%  { opacity: 0.3; }
+      14%  { opacity: 1; }
+      100% { opacity: 1; }
+    }
+
+    .screen-content {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 7px;
+      position: relative; z-index: 2;
+      width: 100%;
+      transition: opacity 0.3s;
+    }
+
+    .screen-content.flicker { animation: flicker 0.5s ease-out; }
+
+    .tv-song { font-family: 'Playfair Display', serif !important;
+      font-family: 'Alfa Slab One', serif;
+      font-size: 24px;
+      letter-spacing: 3px;
+      color: #ff6b35;
+      text-align: center;
+      padding: 0 16px;
+      line-height: 1.1;
+      text-shadow: 0 0 20px rgba(255,107,53,0.5);
+      max-width: 100%;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
+    }
+
+    .tv-artist {
+      font-size: 9px;
+      color: #888;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+    }
+
+    /* volume indicator */
+    .vol-bar {
+      display: flex; gap: 2px; align-items: flex-end;
+      height: 14px;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+    .vol-bar.show { opacity: 1; }
+    .vol-seg {
+      width: 4px; border-radius: 1px;
+      background: #333; transition: background 0.15s;
+    }
+    .vol-seg.active { background: #ff6b35; }
+
+    .tv-progress {
+      width: 74%;
+      height: 3px;
+      background: #1e1e1e;
+      border-radius: 2px;
+      cursor: pointer;
+      position: relative;
+    }
+    .tv-progress:hover { background: #2a2a2a; }
+
+    .tv-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6b35, #ff9a6c);
+      border-radius: 2px;
+      width: 0%;
+      transition: width 0.4s linear;
+      position: relative;
+    }
+    .tv-fill::after {
+      content: '';
+      position: absolute; right: -3px; top: -3px;
+      width: 9px; height: 9px;
+      background: #ff6b35;
+      border-radius: 50%;
+      box-shadow: 0 0 6px rgba(255,107,53,0.8);
+    }
+
+    .tv-time {
+      font-size: 9px;
+      color: #3a3a3a;
+      letter-spacing: 1px;
+    }
+
+    /* tape slot */
+    .tv-slot {
+      position: absolute;
+      bottom: 60px; left: 50%; transform: translateX(-50%);
+      width: 156px; height: 10px;
+      background: #2e2e3e;
+      border-radius: 5px;
+      border: 2px solid #1e1e2e;
+    }
+
+    /* bottom bar */
+    .tv-bottom {
+      position: absolute;
+      bottom: 18px; left: 22px; right: 22px;
+      display: flex; align-items: center;
+      justify-content: space-between;
+    }
+
+    .tv-btns { display: flex; gap: 6px; }
+
+    .tvb {
+      width: 28px; height: 28px;
+      background: #2e2e3e;
+      border-radius: 9px;
+      border: 2px solid #1e1e2e;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: all 0.15s;
+      box-shadow: inset 0 2px 0 rgba(255,255,255,0.06);
+    }
+    .tvb:hover { background: #3e3e50; transform: scale(0.95); }
+    .tvb:active { transform: scale(0.88); }
+    .tvb.playing { background: #ff6b35; box-shadow: 0 0 12px rgba(255,107,53,0.5), inset 0 2px 0 rgba(255,255,255,0.15); }
+
+    .tvb svg { width: 12px; height: 12px; fill: #888; }
+    .tvb.playing svg { fill: #fff; }
+    .tvb:hover svg { fill: #bbb; }
+
+    .tv-dot { width: 7px; height: 7px; background: #3e3e50; border-radius: 50%; }
+
+    .tv-knob {
+      width: 36px; height: 36px;
+      background: #2e2e3e;
+      border-radius: 50%;
+      border: 2.5px solid #1e1e2e;
+      box-shadow: inset 0 3px 0 #555566, 0 2px 4px rgba(0,0,0,0.3);
+      cursor: pointer;
+      transition: all 0.2s;
+      position: relative;
+    }
+    .tv-knob::after {
+      content: '';
+      position: absolute; top: 5px; left: 50%; transform: translateX(-50%);
+      width: 3px; height: 3px;
+      background: #555566; border-radius: 50%;
+    }
+    .tv-knob:hover { background: #3e3e50; }
+    .tv-knob:active { transform: scale(0.92); }
+    .tv-knob.on { box-shadow: inset 0 3px 0 #ff6b35, 0 0 8px rgba(255,107,53,0.3); }
+    .tv-knob.on::after { background: #ff6b35; }
+
+    /* ── VHS CARDS ── */
+    .cards-row {
+      display: flex; gap: 14px;
+      align-items: flex-end; justify-content: center;
+    }
+
+    .vc {
+      width: 112px;
+      border-radius: 10px;
+      padding: 10px 10px 0;
+      cursor: pointer;
+      transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s;
+      border: 2.5px solid transparent;
+    }
+    .vc:hover { transform: translateY(-6px); }
+    .vc.active {
+      transform: translateY(-10px) scale(1.06);
+      border-color: #ff6b35;
+      box-shadow: 0 16px 32px rgba(255,107,53,0.22);
+    }
+
+    .vc.cream { background: #f0ebe0; }
+    .vc.red   { background: #c0392b; }
+    .vc.navy  { background: #1e2a45; }
+
+    .ct { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3px; }
+
+    .ctitle { font-family: 'Alfa Slab One', serif; font-size: 12px; line-height: 1; }
+    .vc.cream .ctitle { color: #1a1a1a; }
+    .vc.red .ctitle   { color: #fff; }
+    .vc.navy .ctitle  { color: #e8e8e8; }
+
+    .ubadge { font-size: 7px; font-weight: 700; padding: 2px 5px; border-radius: 3px; }
+    .vc.cream .ubadge { background: #f5c518; color: #1a1a1a; }
+    .vc.red .ubadge   { background: #4a90e2; color: #fff; }
+    .vc.navy .ubadge  { background: #4a90e2; color: #fff; }
+
+    .cyear { font-family: 'Alfa Slab One', serif; font-size: 22px; line-height: 1; margin: 3px 0; }
+    .vc.cream .cyear { color: #1a1a1a; }
+    .vc.red .cyear   { color: #fff; }
+    .vc.navy .cyear  { color: #e8e8e8; }
+
+    .cnp { font-size: 8px; font-weight: 700; padding: 4px 6px; border-radius: 2px; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .vc.cream .cnp { background: #fff; color: #1a1a1a; border: 1px solid #ddd; }
+    .vc.red .cnp   { background: #fff; color: #c0392b; }
+    .vc.navy .cnp  { background: rgba(255,255,255,0.1); color: #e8e8e8; border: 1px solid rgba(255,255,255,0.15); }
+
+    .cmeta { display: flex; justify-content: space-between; font-size: 6px; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .vc.cream .cmeta { color: #888; }
+    .vc.red .cmeta   { color: rgba(255,255,255,0.6); }
+    .vc.navy .cmeta  { color: rgba(232,232,232,0.45); }
+
+    .msq { display: flex; gap: 3px; align-items: center; }
+    .sq  { width: 6px; height: 6px; border-radius: 1px; }
+    .vc.cream .sq { background: #555; }
+    .vc.red .sq   { background: rgba(255,255,255,0.5); }
+    .vc.navy .sq  { background: rgba(232,232,232,0.35); }
+
+    .cass { height: 38px; border-radius: 4px 4px 0 0; display: flex; align-items: center; justify-content: center; gap: 12px; position: relative; }
+    .vc.cream .cass { background: #2a2a2a; }
+    .vc.red .cass   { background: #1a0a08; }
+    .vc.navy .cass  { background: #0d1520; }
+
+    .reel { width: 22px; height: 22px; border-radius: 50%; border: 2px solid #555; background: #1a1a1a; display: flex; align-items: center; justify-content: center; }
+    .ri { width: 7px; height: 7px; border-radius: 50%; background: #444; }
+    .reel.spin { animation: spin 1.2s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .twin { position: absolute; width: 34px; height: 13px; background: rgba(255,255,255,0.03); border: 1px solid #444; border-radius: 1px; }
+  </style>
+</head>
+<body>
+
+  <div class="tv" id="tv">
+    <div class="tv-screen-wrap">
+      <div class="tv-screen" id="tvScreen">
+        <div class="scanlines"></div>
+        <div class="screen-content" id="screenContent">
+          <div class="tv-song" id="tvSong">RIBS</div>
+          <div class="tv-artist" id="tvArtist">LORDE</div>
+          <div class="vol-bar" id="volBar">
+            <div class="vol-seg active" style="height:4px"></div>
+            <div class="vol-seg active" style="height:6px"></div>
+            <div class="vol-seg active" style="height:8px"></div>
+            <div class="vol-seg active" style="height:10px"></div>
+            <div class="vol-seg active" style="height:12px"></div>
+            <div class="vol-seg" style="height:10px"></div>
+            <div class="vol-seg" style="height:8px"></div>
+          </div>
+          <div class="tv-progress" id="tvProg" onclick="seekTo(event)">
+            <div class="tv-fill" id="tvFill"></div>
+          </div>
+          <div class="tv-time" id="tvTime">0:00 / 4:01</div>
+        </div>
+      </div>
+    </div>
+    <div class="tv-slot"></div>
+    <div class="tv-bottom">
+      <div class="tv-btns">
+        <div class="tvb" id="btnVolDown" onclick="volDown()" title="Volume Down">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/></svg>
+        </div>
+        <div class="tvb" id="btnPlay" onclick="togglePlay()" title="Play/Pause">
+          <svg id="playIcon" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+        </div>
+        <div class="tvb" id="btnVolUp" onclick="volUp()" title="Volume Up">
+          <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path d="M16.5 12A4.5 4.5 0 0 0 14 8v8a4.5 4.5 0 0 0 2.5-4z"/><path d="M19 12a7 7 0 0 0-5-6.71v13.42A7 7 0 0 0 19 12z"/></svg>
+        </div>
+      </div>
+      <div class="tv-dot"></div>
+      <div class="tv-knob" id="tvKnob" onclick="togglePower()" title="Power"></div>
+    </div>
+  </div>
+
+  <div class="cards-row">
+    <div class="vc cream" id="c0" onclick="setDec(0)">
+      <div class="ct"><div class="ctitle">INDIE<br>SONGS</div><span class="ubadge">UHS</span></div>
+      <div class="cyear">2020s</div>
+      <div class="cnp" id="cp0">COMING SOON</div>
+      <div class="cmeta"><span>Hi-Fi Stereo</span><div class="msq"><div class="sq"></div><div class="sq"></div><span style="margin-left:2px">Standard</span></div></div>
+      <div class="cass"><div class="twin"></div><div class="reel" id="rl0"><div class="ri"></div></div><div class="reel" id="rr0"><div class="ri"></div></div></div>
+    </div>
+    <div class="vc red active" id="c1" onclick="setDec(1)">
+      <div class="ct"><div class="ctitle">INDIE<br>SONGS</div><span class="ubadge">UHS</span></div>
+      <div class="cyear">2010s</div>
+      <div class="cnp" id="cp1">RIBS</div>
+      <div class="cmeta"><span>Extra Quality</span><div class="msq"><div class="sq"></div><div class="sq"></div><span style="margin-left:2px">Standard</span></div></div>
+      <div class="cass"><div class="twin"></div><div class="reel" id="rl1"><div class="ri"></div></div><div class="reel" id="rr1"><div class="ri"></div></div></div>
+    </div>
+    <div class="vc navy" id="c2" onclick="setDec(2)">
+      <div class="ct"><div class="ctitle">INDIE<br>SONGS</div><span class="ubadge">UHS</span></div>
+      <div class="cyear">2000s</div>
+      <div class="cnp" id="cp2">KIDS</div>
+      <div class="cmeta"><span>Fine Grain</span><div class="msq"><div class="sq"></div><div class="sq"></div><span style="margin-left:2px">Standard</span></div></div>
+      <div class="cass"><div class="twin"></div><div class="reel" id="rl2"><div class="ri"></div></div><div class="reel" id="rr2"><div class="ri"></div></div></div>
+    </div>
+  </div>
+
+<script>
+const D = [
+  { songs: [
+    { n:'Coming Soon', a:'2020s', d:'0:00', src:'' }
+  ]},
+  { songs: [
+    { n:'Ribs',          a:'Lorde',            d:'4:01', src:'ribs.mp3' },
+    { n:'Pumped Up Kicks',a:'Foster The People',d:'3:59', src:'pumped-up-kicks.mp3' }
+  ]},
+  { songs: [
+    { n:'Kids', a:'MGMT', d:'5:02', src:'kids.mp3' }
+  ]}
+];
+
+const audio = new Audio();
+audio.volume = 0.7;
+let dec=1, song=0, playing=false, powered=true, volTimeout=null;
+
+function ft(s){ return Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); }
+
+function loadSong(){
+  const s = D[dec].songs[song];
+  if(s.src){ audio.src = s.src; audio.load(); }
+}
+
+function setDec(i){
+  if(!powered) return;
+  dec=i; song=0;
+  audio.pause(); playing=false;
+  loadSong(); updateUI();
+}
+
+function selSong(i){
+  if(!powered) return;
+  song=i; loadSong();
+  audio.play(); playing=true; updateUI();
+}
+
+function togglePlay(){
+  if(!powered) return;
+  if(!D[dec].songs[song].src) return;
+  if(playing){ audio.pause(); playing=false; }
+  else { audio.play(); playing=true; }
+  updateUI();
+}
+
+function volDown(){
+  if(!powered) return;
+  audio.volume = Math.max(0, +(audio.volume - 0.15).toFixed(2));
+  showVol();
+}
+
+function volUp(){
+  if(!powered) return;
+  audio.volume = Math.min(1, +(audio.volume + 0.15).toFixed(2));
+  showVol();
+}
+
+function showVol(){
+  const segs = document.querySelectorAll('.vol-seg');
+  const level = Math.round(audio.volume * segs.length);
+  segs.forEach((s,i) => s.classList.toggle('active', i < level));
+  const bar = document.getElementById('volBar');
+  bar.classList.add('show');
+  clearTimeout(volTimeout);
+  volTimeout = setTimeout(()=> bar.classList.remove('show'), 1500);
+}
+
+function togglePower(){
+  powered = !powered;
+  const screen = document.getElementById('tvScreen');
+  const knob   = document.getElementById('tvKnob');
+  const tv     = document.getElementById('tv');
+  const content= document.getElementById('screenContent');
+
+  if(!powered){
+    audio.pause(); playing=false;
+    screen.classList.remove('glow');
+    content.style.opacity = '0';
+    setTimeout(()=>{ screen.style.background='#000'; },200);
+    knob.classList.remove('on');
+    tv.classList.add('off');
+  } else {
+    tv.classList.remove('off');
+    screen.style.background = '#080808';
+    setTimeout(()=>{
+      content.style.opacity='1';
+      content.classList.add('flicker');
+      setTimeout(()=> content.classList.remove('flicker'), 600);
+      knob.classList.add('on');
+    }, 300);
+  }
+  updateUI();
+}
+
+function seekTo(e){
+  if(!powered||!audio.duration) return;
+  const b=document.getElementById('tvProg');
+  const r=b.getBoundingClientRect();
+  audio.currentTime = Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)) * audio.duration;
+}
+
+audio.addEventListener('timeupdate',()=>{
+  if(!audio.duration) return;
+  const pct = Math.round((audio.currentTime/audio.duration)*100);
+  document.getElementById('tvFill').style.width = pct+'%';
+  document.getElementById('tvTime').textContent = ft(Math.floor(audio.currentTime))+' / '+ft(Math.floor(audio.duration));
+});
+
+audio.addEventListener('ended',()=>{
+  song=(song+1)%D[dec].songs.length;
+  loadSong(); audio.play(); updateUI();
+});
+
+function updateUI(){
+  const s = D[dec].songs[song];
+  document.getElementById('tvSong').textContent   = s.n.toUpperCase();
+  document.getElementById('tvArtist').textContent = s.a.toUpperCase();
+
+  // play button icon + glow
+  const playBtn  = document.getElementById('btnPlay');
+  const playIcon = document.getElementById('playIcon');
+  const screen   = document.getElementById('tvScreen');
+
+  if(playing){
+    playBtn.classList.add('playing');
+    playIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+    screen.classList.add('glow');
+    document.getElementById('tvKnob').classList.add('on');
+  } else {
+    playBtn.classList.remove('playing');
+    playIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+    screen.classList.remove('glow');
+    if(powered) document.getElementById('tvKnob').classList.remove('on');
+  }
+
+  // cards
+  for(let i=0;i<3;i++){
+    document.getElementById('c'+i).classList.toggle('active', i===dec);
+    const sp = i===dec && playing;
+    document.getElementById('rl'+i).classList.toggle('spin', sp);
+    document.getElementById('rr'+i).classList.toggle('spin', sp);
+    document.getElementById('cp'+i).textContent = i===dec ? s.n.toUpperCase().slice(0,13) : ['COMING SOON','RIBS','KIDS'][i];
+  }
+}
+
+loadSong();
+updateUI();
+</script>
+</body>
+</html>
